@@ -1,0 +1,758 @@
+// ==========================================
+// CONFIGURATION & FIREBASE LEADERBOARD
+// ==========================================
+const firebaseConfig = {
+    apiKey: "AIzaSyDodVVCiIk8OS-hXKWOanZHVvZJrKGQIGQ",
+    authDomain: "gamenarkoba.firebaseapp.com",
+    databaseURL: "https://gamenarkoba-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "gamenarkoba",
+    storageBucket: "gamenarkoba.firebasestorage.app",
+    messagingSenderId: "179562986907",
+    appId: "1:179562986907:web:2e7cf37a913f512bce753e"
+};
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// ==========================================
+// GAME DATA
+// ==========================================
+const rawQuestions = [
+    {
+        q: "Adiksi narkoba merupakan ....",
+        options: [
+            "Penyakit otak yang bersifat kronis dan kambuhan",
+            "Penyakit menular akibat virus",
+            "Gangguan fisik yang berlangsung singkat",
+            "Kebiasaan yang dapat dihentikan kapan saja"
+        ],
+        ans: "Penyakit otak yang bersifat kronis dan kambuhan"
+    },
+    {
+        q: "Seseorang dikatakan mengalami adiksi apabila ....",
+        options: [
+            "Menggunakan obat sesuai resep dokter",
+            "Memiliki keinginan terus-menerus untuk menggunakan zat",
+            "Menolak menggunakan zat berbahaya",
+            "Menggunakan obat hanya saat sakit"
+        ],
+        ans: "Memiliki keinginan terus-menerus untuk menggunakan zat"
+    },
+    {
+        q: "Salah satu tanda terjadinya toleransi pada pengguna narkoba adalah ....",
+        options: [
+            "Membutuhkan dosis lebih tinggi untuk mendapatkan efek yang sama",
+            "Tidak lagi merasakan efek narkoba sama sekali",
+            "Dapat berhenti menggunakan narkoba tanpa kesulitan",
+            "Mengurangi penggunaan secara bertahap"
+        ],
+        ans: "Membutuhkan dosis lebih tinggi untuk mendapatkan efek yang sama"
+    },
+    {
+        q: "Zat psikoaktif utama yang terkandung dalam ganja adalah ....",
+        options: [
+            "Nikotin",
+            "Kafein",
+            "THC",
+            "Morfin"
+        ],
+        ans: "THC"
+    },
+    {
+        q: "Penggunaan ganja dapat menyebabkan ....",
+        options: [
+            "Disorientasi ruang dan waktu",
+            "Peningkatan daya ingat permanen",
+            "Pertumbuhan fisik lebih cepat",
+            "Peningkatan konsentrasi belajar"
+        ],
+        ans: "Disorientasi ruang dan waktu"
+    },
+    {
+        q: "Salah satu dampak penggunaan sabu adalah ....",
+        options: [
+            "Penurunan rasa percaya diri",
+            "Peningkatan tenaga secara drastis untuk sementara waktu",
+            "Penurunan detak jantung",
+            "Nafsu makan meningkat terus-menerus"
+        ],
+        ans: "Peningkatan tenaga secara drastis untuk sementara waktu"
+    },
+    {
+        q: "Ekstasi dapat menyebabkan ....",
+        options: [
+            "Euforia sesaat",
+            "Penurunan kesadaran permanen",
+            "Peningkatan daya tahan tubuh",
+            "Pertumbuhan otot lebih cepat"
+        ],
+        ans: "Euforia sesaat"
+    },
+    {
+        q: "Berikut yang merupakan gejala seseorang kemungkinan mengalami kecanduan narkoba adalah ....",
+        options: [
+            "Pola hidup semakin teratur",
+            "Lebih peduli terhadap kebersihan diri",
+            "Mudah marah dan tersinggung",
+            "Prestasi belajar meningkat pesat"
+        ],
+        ans: "Mudah marah dan tersinggung"
+    },
+    {
+        q: "Rehabilitasi narkoba adalah ....",
+        options: [
+            "Program penghukuman bagi pengguna narkoba",
+            "Serangkaian kegiatan pemulihan fisik, mental, dan sosial",
+            "Proses penyidikan terhadap pengguna narkoba",
+            "Kegiatan pencegahan peredaran narkoba"
+        ],
+        ans: "Serangkaian kegiatan pemulihan fisik, mental, dan sosial"
+    },
+    {
+        q: "Tujuan utama rehabilitasi narkoba adalah....",
+        options: [
+            "Pulih, produktif, dan berfungsi sosial",
+            "Terhindar dari pendidikan formal",
+            "Dijauhkan dari masyarakat selamanya",
+            "Dibebaskan dari seluruh tanggung jawab"
+        ],
+        ans: "Pulih, produktif, dan berfungsi sosial"
+    }
+];
+
+// ==========================================
+// SOUND SYNTHESIZER (Web Audio API)
+// ==========================================
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new AudioContext();
+    }
+}
+
+function playSound(type) {
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    const now = audioCtx.currentTime;
+    
+    if (type === 'click') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+    } 
+    else if (type === 'correct') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.setValueAtTime(600, now + 0.1);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    }
+    else if (type === 'wrong') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    }
+    else if (type === 'countdown') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, now);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+    }
+    else if (type === 'go') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(880, now);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.5);
+    }
+    else if (type === 'win') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.setValueAtTime(500, now + 0.1);
+        osc.frequency.setValueAtTime(600, now + 0.2);
+        osc.frequency.setValueAtTime(800, now + 0.3);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.8);
+        osc.start(now);
+        osc.stop(now + 0.8);
+    }
+    else if (type === 'lose') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.6);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.8);
+        osc.start(now);
+        osc.stop(now + 0.8);
+    }
+    else if (type === 'collect') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+        osc.frequency.setValueAtTime(1200, now + 0.1);
+        osc.frequency.exponentialRampToValueAtTime(1600, now + 0.2);
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    }
+}
+
+// ==========================================
+// GAME STATE & VARIABLES
+// ==========================================
+let currentIndex = 0;
+let playerScore = 0;
+let opponentScore = 0;
+let totalItems = rawQuestions.length;
+let isProcessing = false;
+let assessmentData = [];
+let playerName = "";
+
+// Timer variables
+let currentTimer = null;
+const maxTime = 60;
+let timeLeft = maxTime;
+let gameStartTime = 0;
+let totalGameTime = 0;
+
+// DOM Elements
+const overlay = document.getElementById('transition-overlay');
+const viewSetupName = document.getElementById('view-setup-name');
+const viewCountdown = document.getElementById('view-countdown');
+const viewAssessment = document.getElementById('view-assessment');
+const viewResult = document.getElementById('view-result');
+
+const roadLine = document.getElementById('road-line');
+const finishLine = document.getElementById('finish-line');
+const carPlayer = document.getElementById('car-player');
+const carOpponent = document.getElementById('car-opponent');
+
+// Event Listeners
+document.getElementById('btn-next').addEventListener('click', goToCountdown);
+document.getElementById('btn-restart').addEventListener('click', returnToSetup);
+
+document.getElementById('input-username').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') goToCountdown();
+});
+
+// ==========================================
+// VIEW NAVIGATION
+// ==========================================
+function switchView(hideElement, showElement, callback) {
+    overlay.style.opacity = '1';
+    
+    setTimeout(() => {
+        hideElement.classList.add('hidden');
+        showElement.classList.remove('hidden');
+        overlay.style.opacity = '0';
+        
+        setTimeout(() => {
+            if(callback) callback();
+        }, 400);
+    }, 400);
+}
+
+function goToCountdown() {
+    initAudio();
+    playSound('click');
+    
+    const inputField = document.getElementById('input-username');
+    let inputName = inputField.value.trim();
+    
+    // VALIDATION: Name cannot be empty
+    if (inputName === "") {
+        inputField.style.borderColor = 'var(--danger)';
+        inputField.style.animation = 'shake 0.4s ease-in-out';
+        
+        setTimeout(() => {
+            inputField.style.borderColor = 'rgba(255,255,255,0.1)';
+            inputField.style.animation = '';
+        }, 1500);
+        
+        inputField.focus();
+        return; // Stop execution
+    }
+    
+    playerName = inputName;
+    
+    // Update labels globally
+    document.getElementById('label-car-player').textContent = playerName;
+    document.getElementById('label-score-player').textContent = playerName;
+    document.getElementById('result-name').textContent = playerName;
+    
+    prepareAssessmentForCountdown();
+    switchView(viewSetupName, viewAssessment, startCountdownSequence);
+}
+
+// ==========================================
+// COUNTDOWN SEQUENCE
+// ==========================================
+function startCountdownSequence() {
+    const texts = ["3", "2", "1", "GO!"];
+    let i = 0;
+    const el = document.getElementById('countdown-text');
+    const circle = document.getElementById('countdown-circle');
+    
+    el.textContent = texts[0];
+    el.style.color = 'var(--primary)';
+    if(circle) circle.style.transform = 'scale(1)';
+    
+    const countInterval = setInterval(() => {
+        i++;
+        if (i < texts.length) {
+            el.textContent = texts[i];
+            
+            if (texts[i] === "GO!") {
+                el.style.color = 'var(--success)';
+                playSound('go');
+            } else {
+                playSound('countdown');
+            }
+            
+            // Pop animation
+            if(circle) {
+                circle.style.transform = 'scale(1.15)';
+                setTimeout(() => { circle.style.transform = 'scale(1)'; }, 150);
+            }
+            
+        } else {
+            clearInterval(countInterval);
+            document.getElementById('assessment-countdown-overlay').classList.add('hidden');
+            roadLine.style.animationPlayState = 'running';
+            setTimeout(() => {
+                carPlayer.style.transition = 'left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                carOpponent.style.transition = 'left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            }, 50);
+            gameStartTime = Date.now();
+            startQuestionTimer();
+        }
+    }, 1000);
+}
+
+// ==========================================
+// HELPER: SHUFFLE
+// ==========================================
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+// ==========================================
+// GAMEPLAY MECHANICS
+// ==========================================
+function prepareAssessmentForCountdown() {
+    document.getElementById('assessment-countdown-overlay').classList.remove('hidden');
+    
+    // Deep copy the raw data so we don't mutate original
+    assessmentData = JSON.parse(JSON.stringify(rawQuestions));
+    
+    // Shuffle the options for each question
+    assessmentData.forEach(item => {
+        shuffleArray(item.options);
+    });
+    
+    currentIndex = 0;
+    playerScore = 0;
+    opponentScore = 0;
+    
+    // Reset UI Elements
+    document.getElementById('score-player-val').textContent = '0';
+    document.getElementById('score-opponent-val').textContent = '0';
+    document.getElementById('progress-fill').style.width = '0%';
+    
+    // Reset Cars
+    carPlayer.style.transition = 'none';
+    carOpponent.style.transition = 'none';
+    carPlayer.style.left = '2%';
+    carOpponent.style.left = '2%';
+    finishLine.style.right = '-100px';
+    
+    roadLine.style.animationPlayState = 'paused';
+    
+    displayCurrentItem(false);
+}
+
+// ==========================================
+// TIMER LOGIC
+// ==========================================
+function startQuestionTimer() {
+    timeLeft = maxTime;
+    updateTimerUI();
+    
+    if (currentTimer) clearInterval(currentTimer);
+    
+    currentTimer = setInterval(() => {
+        timeLeft--;
+        updateTimerUI();
+        
+        if (timeLeft <= 0) {
+            clearInterval(currentTimer);
+            // Auto evaluate as wrong (timeout)
+            evaluateSelection(null, assessmentData[currentIndex].ans, null);
+        }
+    }, 1000);
+}
+
+function updateTimerUI() {
+    const fill = document.getElementById('timer-fill');
+    const text = document.getElementById('timer-text');
+    
+    text.textContent = `${timeLeft}s`;
+    fill.style.width = `${(timeLeft / maxTime) * 100}%`;
+    
+    if (timeLeft > 20) {
+        fill.style.background = 'var(--success)';
+        fill.style.boxShadow = '0 0 10px var(--success-glow)';
+        text.style.color = '#fff';
+        text.style.transform = 'scale(1)';
+    } else if (timeLeft > 10) {
+        fill.style.background = '#f59e0b';
+        fill.style.boxShadow = '0 0 10px rgba(245,158,11,0.5)';
+        text.style.color = '#f59e0b';
+        text.style.transform = 'scale(1)';
+    } else {
+        fill.style.background = 'var(--danger)';
+        fill.style.boxShadow = '0 0 10px var(--danger-glow)';
+        text.style.color = 'var(--danger)';
+        
+        // Pulse effect when < 10 seconds
+        if (timeLeft % 2 === 0) text.style.transform = 'scale(1.15)';
+        else text.style.transform = 'scale(1)';
+    }
+}
+
+// ==========================================
+// DISPLAY ITEM & EVALUATION
+// ==========================================
+function displayCurrentItem(startTimer = true) {
+    isProcessing = false;
+    
+    const currentItem = assessmentData[currentIndex];
+    
+    // Update Progress
+    document.getElementById('progress-text').textContent = `Soal ${currentIndex + 1} / ${totalItems}`;
+    let progressPercent = (currentIndex / totalItems) * 100;
+    document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+    
+    // Display Question
+    document.getElementById('equation-display').innerHTML = currentItem.q;
+    
+    // Build Answer Grid
+    const gridContainer = document.getElementById('answer-grid');
+    gridContainer.innerHTML = '';
+    
+    currentItem.options.forEach(optionText => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-option';
+        btn.textContent = optionText;
+        btn.addEventListener('click', () => evaluateSelection(optionText, currentItem.ans, btn));
+        gridContainer.appendChild(btn);
+    });
+    
+    // Start the countdown timer for this question
+    if (startTimer) {
+        startQuestionTimer();
+    }
+}
+
+function evaluateSelection(selectedValue, correctValue, elementBtn) {
+    if (isProcessing) return;
+    isProcessing = true;
+    
+    // Stop the timer
+    if (currentTimer) clearInterval(currentTimer);
+    
+    const buttons = document.getElementById('answer-grid').querySelectorAll('.btn-option');
+    
+    // Disable all buttons and highlight correct answer
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        if (btn.textContent === correctValue) {
+            btn.classList.add('status-correct');
+        }
+    });
+    
+    let advancingCar;
+    
+    if (selectedValue === correctValue) {
+        // Player answered correctly
+        playerScore++;
+        if (elementBtn) elementBtn.classList.add('status-correct');
+        document.getElementById('score-player-val').textContent = playerScore;
+        advancingCar = carPlayer;
+        playSound('correct');
+    } else {
+        // Player answered wrong OR Timeout occurred
+        opponentScore++;
+        if (elementBtn) {
+            elementBtn.classList.add('status-wrong');
+            // Shake the wrong button
+            elementBtn.style.animation = 'shake 0.4s ease-in-out';
+        }
+        document.getElementById('score-opponent-val').textContent = opponentScore;
+        advancingCar = carOpponent;
+        playSound('wrong');
+        
+        // If timeout, display Waktu Habis message
+        if (selectedValue === null) {
+            document.getElementById('equation-display').innerHTML += '<br><span style="color:var(--danger); font-size:1.1rem; display:block; margin-top:15px; text-transform:uppercase; letter-spacing:2px; animation:shake 0.4s ease-in-out;">⏳ WAKTU HABIS! ⏳</span>';
+        }
+    }
+    
+    // Play boost animation on the advancing car
+    const visual = advancingCar.querySelector('.car-visual');
+    visual.classList.add('car-boost');
+    setTimeout(() => visual.classList.remove('car-boost'), 400);
+    
+    // Move Cars proportionally to the track (uses 55% width before finish)
+    let stepSize = 50 / totalItems; 
+    let playerPos = 2 + (playerScore * stepSize);
+    let opponentPos = 2 + (opponentScore * stepSize);
+    
+    carPlayer.style.left = `${playerPos}%`;
+    carOpponent.style.left = `${opponentPos}%`;
+    
+    // Proceed to next or finish
+    setTimeout(() => {
+        currentIndex++;
+        if (currentIndex < assessmentData.length) {
+            displayCurrentItem();
+        } else {
+            triggerFinishLine();
+        }
+    }, 1800); // 1.8 seconds delay so user can read the correct answer
+}
+
+function triggerFinishLine() {
+    // Calculate total time
+    totalGameTime = Math.floor((Date.now() - gameStartTime) / 1000);
+    
+    // Stop road animation
+    roadLine.style.animationPlayState = 'paused';
+    
+    // Bring in finish line & trophy
+    finishLine.style.right = '8%';
+    const trophy = document.getElementById('trophy-item');
+    if (trophy) {
+        trophy.classList.remove('trophy-taken');
+        if (playerScore > opponentScore) {
+            trophy.style.top = '10px';
+            trophy.style.bottom = 'auto';
+        } else if (playerScore < opponentScore) {
+            trophy.style.bottom = '10px';
+            trophy.style.top = 'auto';
+        } else {
+            trophy.style.top = 'calc(50% - 30px)';
+            trophy.style.bottom = 'auto';
+        }
+    }
+    
+    // Update progress to 100%
+    document.getElementById('progress-fill').style.width = '100%';
+    
+    // Move winning car past finish line
+    setTimeout(() => {
+        if (playerScore > opponentScore) {
+            carPlayer.style.left = '120%';
+            setTimeout(() => { 
+                if(trophy) trophy.classList.add('trophy-taken'); 
+                playSound('collect');
+            }, 200);
+        } else if (playerScore < opponentScore) {
+            carOpponent.style.left = '120%';
+            setTimeout(() => { 
+                if(trophy) trophy.classList.add('trophy-taken'); 
+                playSound('collect');
+            }, 200);
+        } else {
+            carPlayer.style.left = '120%';
+            carOpponent.style.left = '120%';
+            setTimeout(() => { 
+                if(trophy) trophy.classList.add('trophy-taken'); 
+                playSound('collect');
+            }, 200);
+        }
+    }, 800);
+    
+    setTimeout(() => {
+        switchView(viewAssessment, viewResult, setFinalResultData);
+    }, 2200);
+}
+
+// ==========================================
+// RESULT HANDLER
+// ==========================================
+function setFinalResultData() {
+    let finalPercentage = Math.round((playerScore / totalItems) * 100);
+    
+    // Animate score counter
+    const scoreDisplay = document.getElementById('score-display');
+    let currentScore = 0;
+    const duration = 1000;
+    const interval = 20;
+    const step = finalPercentage / (duration / interval);
+    
+    const counter = setInterval(() => {
+        currentScore += step;
+        if (currentScore >= finalPercentage) {
+            scoreDisplay.textContent = finalPercentage;
+            clearInterval(counter);
+        } else {
+            scoreDisplay.textContent = Math.round(currentScore);
+        }
+    }, interval);
+    
+    // Set UI outcome
+    document.getElementById('time-display').textContent = totalGameTime + "s";
+    const outcomeTitle = document.getElementById('race-outcome');
+    const predicateElement = document.getElementById('predicate-display');
+    const resultIcon = document.getElementById('result-icon');
+    
+    if (playerScore > opponentScore) {
+        outcomeTitle.textContent = "Sangat Baik!";
+        outcomeTitle.className = "win-text";
+        predicateElement.textContent = "Anda berhasil menjawab lebih baik dan mengalahkan Musuh.";
+        resultIcon.textContent = "🏆";
+        playSound('win');
+    } else if (playerScore < opponentScore) {
+        outcomeTitle.textContent = "Kurang Tepat";
+        outcomeTitle.className = "lose-text";
+        predicateElement.textContent = "Nilai Anda lebih rendah dari Musuh. Ayo pelajari lagi materinya!";
+        resultIcon.textContent = "💥";
+        playSound('lose');
+    } else {
+        outcomeTitle.textContent = "Hasil Seimbang";
+        outcomeTitle.className = "tie-text";
+        predicateElement.textContent = "Perolehan nilai Anda seimbang dengan Musuh.";
+        resultIcon.textContent = "🤝";
+        playSound('win');
+    }
+    
+    // Submit score in the background
+    submitScoreToLeaderboard();
+}
+
+function returnToSetup() {
+    playSound('click');
+    switchView(viewResult, viewSetupName, () => {
+        document.getElementById('input-username').value = "";
+    });
+}
+
+// ==========================================
+// LEADERBOARD LOGIC
+// ==========================================
+const leaderboardModal = document.getElementById('leaderboard-modal');
+const btnCloseLeaderboard = document.getElementById('btn-close-leaderboard');
+const leaderboardTable = document.getElementById('leaderboard-table');
+const leaderboardBody = document.getElementById('leaderboard-body');
+const leaderboardLoading = document.getElementById('leaderboard-loading');
+const leaderboardError = document.getElementById('leaderboard-error');
+
+// Event Listeners for Leaderboard Buttons
+document.querySelectorAll('.btn-leaderboard').forEach(btn => {
+    btn.addEventListener('click', () => {
+        playSound('click');
+        openLeaderboard();
+    });
+});
+btnCloseLeaderboard.addEventListener('click', () => {
+    playSound('click');
+    leaderboardModal.classList.add('hidden');
+});
+
+
+// Post Data to Firebase Realtime Database
+async function submitScoreToLeaderboard() {
+    try {
+        // Simpan data (Firebase akan otomatis membuat ID unik dengan push())
+        await database.ref('leaderboard').push({
+            name: playerName,
+            score: playerScore,
+            time: totalGameTime,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        console.log("Berhasil mengirim skor ke Firebase!");
+    } catch (error) {
+        console.error("Gagal mengirim ke Firebase:", error);
+    }
+}
+
+// Fetch Leaderboard from Firebase
+async function openLeaderboard() {
+    leaderboardModal.classList.remove('hidden');
+    leaderboardTable.classList.add('hidden');
+    leaderboardError.classList.add('hidden');
+    leaderboardLoading.classList.remove('hidden');
+    leaderboardBody.innerHTML = '';
+    
+    try {
+        // Ambil data dari Firebase, urutkan berdasarkan skor (nilai terendah ke tertinggi)
+        const snapshot = await database.ref('leaderboard').orderByChild('score').once('value');
+        const data = snapshot.val();
+        
+        leaderboardLoading.classList.add('hidden');
+        
+        if (data) {
+            // Ubah object JSON menjadi array
+            let leaderboardArray = Object.keys(data).map(key => data[key]);
+            
+            // Urutkan: Skor tertinggi dulu, jika seri, waktu tercepat
+            leaderboardArray.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score; // Descending
+                } else {
+                    return a.time - b.time; // Ascending
+                }
+            });
+            
+            // Ambil Top 10
+            leaderboardArray = leaderboardArray.slice(0, 10);
+            
+            leaderboardArray.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${row.name}</td>
+                    <td>${row.score * 10}</td>
+                    <td>${row.time}s</td>
+                `;
+                leaderboardBody.appendChild(tr);
+            });
+            leaderboardTable.classList.remove('hidden');
+        } else {
+            leaderboardError.textContent = "Belum ada data di Papan Peringkat.";
+            leaderboardError.classList.remove('hidden');
+        }
+        
+    } catch (error) {
+        leaderboardLoading.classList.add('hidden');
+        leaderboardError.textContent = "Gagal menghubungi database: " + error.message;
+        leaderboardError.classList.remove('hidden');
+        console.error("Firebase Error:", error);
+    }
+}
